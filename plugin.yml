@@ -1,0 +1,23 @@
+name: UltimateAntiGlitch
+version: 1.0.0
+main: Phoenix4041\UltimateAntiGlitch\UltimateAntiGlitch
+api: 5.0.0
+author: Phoenix4041
+description: Plugin ultimateAntiGlitch para prevenir bugs de perlas de ender y desconexión
+website: https://github.com/Phoenix4041
+
+permissions:
+  ultimateantiglitch.bypass:
+    description: Permite bypasear las protecciones UltimateAntiGlitch
+    default: op
+
+commands:
+  ultimateantiglitch:
+    description: Comandos del plugin ultimateAntiGlitch
+    usage: /ultimateAntiGlitch <reload|info|check>
+    permission: ultimateantiglitch.admin
+    
+permissions:
+  ultimateantiglitch.admin:
+    description: Permite usar comandos de administración del plugin
+    default: op
