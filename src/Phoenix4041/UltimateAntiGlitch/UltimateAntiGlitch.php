@@ -37,6 +37,8 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     private array $playerVelocity = [];
     private array $lastMoveTime = [];
     private array $violationCount = [];
+    private array $safePositions = []; // Almacena posiciones seguras conocidas
+    private array $pearlStartPositions = []; // Almacena posiciones donde empezó el uso de pearl
     private Config $config;
     
     public function onEnable(): void {
@@ -86,7 +88,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
                     
                 case "info":
                     $sender->sendMessage("§e=== UltimateAntiGlitch Info ===");
-                    $sender->sendMessage("§7Versión: §f1.0.0 (Sin Kicks/Freeze)");
+                    $sender->sendMessage("§7Versión: §f1.0.1 (Sin Logs de Velocidad)");
                     $sender->sendMessage("§7Autor: §fPhoenix4041");
                     $sender->sendMessage("§7Jugadores monitoreados: §f" . count($this->playerPositions));
                     $sender->sendMessage("§7Cooldowns activos: §f" . count($this->pearlCooldowns));
@@ -112,7 +114,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     }
     
     /**
-     * Maneja el uso de perlas de ender - RESTAURADO
+     * Maneja el uso de perlas de ender - MEJORADO
      */
     public function onPlayerItemUse(PlayerItemUseEvent $event): void {
         $player = $event->getPlayer();
@@ -125,6 +127,9 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
             if ($player->hasPermission("ultimateantiglitch.bypass")) {
                 return;
             }
+            
+            // Guardar posición exacta donde empezó a usar la pearl
+            $this->pearlStartPositions[$playerName] = $player->getPosition();
             
             // Verificar cooldown
             if (isset($this->pearlCooldowns[$playerName])) {
@@ -158,7 +163,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     }
     
     /**
-     * Maneja el lanzamiento de proyectiles - RESTAURADO
+     * Maneja el lanzamiento de proyectiles
      */
     public function onProjectileLaunch(ProjectileLaunchEvent $event): void {
         $entity = $event->getEntity();
@@ -180,7 +185,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     }
     
     /**
-     * Maneja el impacto de proyectiles - RESTAURADO
+     * Maneja el impacto de proyectiles - MEJORADO
      */
     public function onProjectileHit(ProjectileHitEvent $event): void {
         $entity = $event->getEntity();
@@ -196,25 +201,28 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
                     $hitPos = $entity->getPosition()->asVector3();
                     $distance = $data["start_pos"]->distance($hitPos);
                     $travelTime = microtime(true) - $data["launch_time"];
+                    $playerName = $data["player"];
                     
                     // Verificar distancia máxima
                     if ($distance > $this->config->get("max-pearl-distance")) {
                         $this->addViolation($player, "Pearl distancia excesiva: {$distance} bloques");
                         
-                        // Cancelar el teletransporte devolviendo al jugador a su posición anterior
-                        if (isset($this->playerPositions[$data["player"]])) {
-                            $player->teleport($this->playerPositions[$data["player"]]);
-                            $player->sendMessage("§eHas sido regresado por usar pearl muy lejos.");
+                        // Regresar a la posición exacta donde empezó la pearl
+                        if (isset($this->pearlStartPositions[$playerName])) {
+                            $player->teleport($this->pearlStartPositions[$playerName]);
+                            $player->sendMessage("§eHas sido regresado al punto donde empezaste a usar la pearl.");
                         }
                         return;
                     }
                     
-                    // Verificar velocidad sospechosa (muy rápido = posible glitch)
+                    // Verificar velocidad sospechosa
                     if ($travelTime < 0.1 && $distance > 5) {
                         $this->addViolation($player, "Pearl velocidad sospechosa");
-                        if (isset($this->playerPositions[$data["player"]])) {
-                            $player->teleport($this->playerPositions[$data["player"]]);
-                            $player->sendMessage("§eHas sido regresado por velocidad de pearl sospechosa.");
+                        
+                        // Regresar a la posición exacta donde empezó la pearl
+                        if (isset($this->pearlStartPositions[$playerName])) {
+                            $player->teleport($this->pearlStartPositions[$playerName]);
+                            $player->sendMessage("§eHas sido regresado al punto donde empezaste a usar la pearl.");
                         }
                         return;
                     }
@@ -226,9 +234,11 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
                     
                     if ($blockAt->isSolid() && $blockAbove->isSolid()) {
                         $this->addViolation($player, "Pearl destino dentro de bloques");
-                        if (isset($this->playerPositions[$data["player"]])) {
-                            $player->teleport($this->playerPositions[$data["player"]]);
-                            $player->sendMessage("§eHas sido regresado por destino de pearl inválido.");
+                        
+                        // Regresar a la posición exacta donde empezó la pearl
+                        if (isset($this->pearlStartPositions[$playerName])) {
+                            $player->teleport($this->pearlStartPositions[$playerName]);
+                            $player->sendMessage("§eHas sido regresado al punto donde empezaste a usar la pearl.");
                         }
                         return;
                     }
@@ -240,7 +250,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     }
     
     /**
-     * Maneja el movimiento de jugadores - RESTAURADO
+     * Maneja el movimiento de jugadores - MEJORADO SIN LOGS DE VELOCIDAD
      */
     public function onPlayerMove(PlayerMoveEvent $event): void {
         $player = $event->getPlayer();
@@ -251,6 +261,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         // Skip si tiene bypass
         if ($player->hasPermission("ultimateantiglitch.bypass")) {
             $this->playerPositions[$playerName] = $to;
+            $this->safePositions[$playerName] = $to; // Actualizar posición segura
             return;
         }
         
@@ -260,7 +271,12 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         // Actualizar tiempo del último movimiento
         $this->lastMoveTime[$playerName] = $currentTime;
         
-        // Calcular velocidad
+        // Actualizar posición segura solo si el movimiento es normal
+        if ($distance < 2.0 && !$this->isPlayerInsideSolidBlocks($player, $to)) {
+            $this->safePositions[$playerName] = $from;
+        }
+        
+        // Calcular velocidad sin logs
         if (isset($this->playerVelocity[$playerName])) {
             $timeDiff = $currentTime - $this->playerVelocity[$playerName]["time"];
             if ($timeDiff > 0) {
@@ -273,41 +289,33 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
             }
         } else {
             $this->playerVelocity[$playerName] = [
-                "velocity" => $distance * 20, // Aproximación por tick
+                "velocity" => $distance * 20,
                 "time" => $currentTime,
                 "distance" => $distance
             ];
         }
         
-        // Detectar teletransporte ilegal (movimiento instantáneo de larga distancia)
-        if ($distance > 8.0) { // Distancia sospechosa en un solo movimiento
-            $this->addViolation($player, "Movimiento sospechoso: {$distance} bloques");
+        // Detectar teletransporte ilegal
+        if ($distance > 8.0) {
+            $this->addViolation($player, "Movimiento sospechoso");
             $event->cancel();
             
-            // Devolver al jugador a su posición anterior conocida
-            if (isset($this->playerPositions[$playerName])) {
-                $this->getScheduler()->scheduleDelayedTask(new ClosureTask(
-                    function() use ($player, $playerName): void {
-                        if ($player->isOnline() && isset($this->playerPositions[$playerName])) {
-                            $player->teleport($this->playerPositions[$playerName]);
-                            $player->sendMessage("§eHas sido regresado por movimiento sospechoso.");
-                        }
-                    }
-                ), 1);
-            }
+            // Regresar a la posición segura exacta
+            $this->returnToSafePosition($player);
             return;
         }
         
-        // Detectar velocidad excesiva
+        // Detectar velocidad excesiva SIN LOGS
         if (isset($this->playerVelocity[$playerName])) {
             $velocity = $this->playerVelocity[$playerName]["velocity"];
-            
-            // Velocidad máxima permitida (bloques por segundo)
             $maxVelocity = $player->isFlying() ? 20.0 : 12.0;
             
             if ($velocity > $maxVelocity && $distance > 1.0) {
-                $this->addViolation($player, "Velocidad excesiva: {$velocity} b/s");
+                $this->addViolation($player, "Velocidad excesiva");
                 $event->cancel();
+                
+                // Regresar a la posición segura exacta
+                $this->returnToSafePosition($player);
                 return;
             }
         }
@@ -316,11 +324,49 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         if ($this->isPlayerInsideSolidBlocks($player, $to)) {
             $this->addViolation($player, "Atravesando bloques sólidos");
             $event->cancel();
+            
+            // Regresar a la posición segura exacta
+            $this->returnToSafePosition($player);
             return;
         }
         
         // Actualizar posición válida
-        $this->playerPositions[$playerName] = $from; // Guardar la posición anterior válida
+        $this->playerPositions[$playerName] = $from;
+    }
+    
+    /**
+     * Regresa al jugador a su posición segura exacta
+     */
+    private function returnToSafePosition(Player $player): void {
+        $playerName = $player->getName();
+        
+        $this->getScheduler()->scheduleDelayedTask(new ClosureTask(
+            function() use ($player, $playerName): void {
+                if ($player->isOnline()) {
+                    $safePos = null;
+                    
+                    // Prioridad 1: Posición segura registrada
+                    if (isset($this->safePositions[$playerName])) {
+                        $safePos = $this->safePositions[$playerName];
+                    }
+                    // Prioridad 2: Posición anterior conocida
+                    elseif (isset($this->playerPositions[$playerName])) {
+                        $safePos = $this->playerPositions[$playerName];
+                    }
+                    // Prioridad 3: Posición de inicio de pearl
+                    elseif (isset($this->pearlStartPositions[$playerName])) {
+                        $safePos = $this->pearlStartPositions[$playerName];
+                    }
+                    // Último recurso: Spawn
+                    else {
+                        $safePos = $player->getWorld()->getSpawnLocation();
+                    }
+                    
+                    $player->teleport($safePos);
+                    $player->sendMessage("§eHas sido regresado a tu posición segura.");
+                }
+            }
+        ), 1);
     }
     
     /**
@@ -336,21 +382,14 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
             
             // Verificar si está dentro de bloques sólidos
             if ($this->isPlayerInsideSolidBlocks($player)) {
-                // Intentar sacarlo de los bloques
-                $safePos = $this->findSafePosition($player);
-                if ($safePos !== null) {
-                    $player->teleport($safePos);
-                    $player->sendMessage("§eHas sido movido a una posición segura.");
-                } else {
-                    $this->addViolation($player, "Stuck dentro de bloques");
-                }
+                $this->addViolation($player, "Stuck dentro de bloques");
+                $this->returnToSafePosition($player);
             }
             
             // Verificar afk para posibles glitches de desconexión
             if (isset($this->lastMoveTime[$playerName])) {
                 $timeSinceMove = microtime(true) - $this->lastMoveTime[$playerName];
                 
-                // Si está inmóvil por más de 30 segundos mientras rompe bloques
                 if ($timeSinceMove > 30 && isset($this->blockBreakData[$playerName])) {
                     $this->addViolation($player, "AFK mientras rompe bloques");
                 }
@@ -359,7 +398,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     }
     
     /**
-     * Maneja cuando un jugador rompe un bloque - RESTAURADO
+     * Maneja cuando un jugador rompe un bloque
      */
     public function onBlockBreak(BlockBreakEvent $event): void {
         $player = $event->getPlayer();
@@ -372,9 +411,9 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         
         // Verificar si está demasiado lejos del bloque
         $distance = $player->getPosition()->distance($block->getPosition());
-        if ($distance > 6.0) { // Rango máximo de rotura
+        if ($distance > 6.0) {
             $event->cancel();
-            $this->addViolation($player, "Rompiendo bloque muy lejos: {$distance} bloques");
+            $this->addViolation($player, "Rompiendo bloque muy lejos");
             return;
         }
         
@@ -391,11 +430,11 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
             function() use ($playerName): void {
                 $this->checkBlockBreakCompletion($playerName);
             }
-        ), 40); // 2 segundos
+        ), 40);
     }
     
     /**
-     * Maneja cuando un jugador se desconecta - RESTAURADO
+     * Maneja cuando un jugador se desconecta
      */
     public function onPlayerQuit(PlayerQuitEvent $event): void {
         $player = $event->getPlayer();
@@ -421,20 +460,21 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         unset($this->blockBreakData[$playerName]);
         unset($this->playerVelocity[$playerName]);
         unset($this->lastMoveTime[$playerName]);
+        unset($this->safePositions[$playerName]);
+        unset($this->pearlStartPositions[$playerName]);
     }
     
     /**
-     * Maneja cuando un jugador se conecta - SIN PENALIZACIONES DE CONGELAMIENTO
+     * Maneja cuando un jugador se conecta
      */
     public function onPlayerJoin(PlayerJoinEvent $event): void {
         $player = $event->getPlayer();
         $playerName = $player->getName();
         
-        // Verificar si había usado glitch de desconexión - SOLO ADVERTENCIA
+        // Verificar si había usado glitch de desconexión
         if (isset($this->disconnectData[$playerName]) && $this->disconnectData[$playerName]["suspicious"]) {
             $timeSinceDisconnect = time() - $this->disconnectData[$playerName]["disconnect_time"];
             
-            // Si se reconectó dentro de 5 minutos, solo advertir
             if ($timeSinceDisconnect < 300) {
                 $player->sendMessage("§eAdvertencia: Se detectó una desconexión sospechosa anterior.");
                 
@@ -448,28 +488,27 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         
         // Inicializar datos del jugador
         $this->playerPositions[$playerName] = $player->getPosition();
+        $this->safePositions[$playerName] = $player->getPosition();
         $this->lastMoveTime[$playerName] = microtime(true);
         $this->violationCount[$playerName] = $this->violationCount[$playerName] ?? 0;
     }
     
     /**
-     * Verifica si un jugador está dentro de bloques sólidos - CORREGIDO
+     * Verifica si un jugador está dentro de bloques sólidos
      */
     private function isPlayerInsideSolidBlocks(Player $player, ?Position $pos = null): bool {
         $position = $pos ?? $player->getPosition();
         $world = $position->getWorld();
         
-        // Verificar múltiples puntos del jugador (cabeza, cuerpo, pies)
         $positions = [
-            $position, // Pies
-            $position->add(0, 1, 0), // Cuerpo
-            $position->add(0, 1.8, 0) // Cabeza
+            $position,
+            $position->add(0, 1, 0),
+            $position->add(0, 1.8, 0)
         ];
         
         foreach ($positions as $checkPos) {
             $block = $world->getBlock($checkPos);
             
-            // Usar getTypeId() para comparar bloques en lugar de equals()
             if ($block->isSolid() && 
                 $block->getTypeId() !== VanillaBlocks::WATER()->getTypeId() && 
                 $block->getTypeId() !== VanillaBlocks::LAVA()->getTypeId()) {
@@ -481,29 +520,25 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     }
     
     /**
-     * Verifica si un jugador está en una posición sospechosa - RESTAURADO
+     * Verifica si un jugador está en una posición sospechosa
      */
     private function isPlayerInSuspiciousPosition(Player $player): bool {
         $position = $player->getPosition();
         
-        // Verificar si está dentro de bloques sólidos
         if ($this->isPlayerInsideSolidBlocks($player)) {
             return true;
         }
         
-        // Verificar movimiento desde la última posición
         $playerName = $player->getName();
         if (isset($this->playerPositions[$playerName])) {
             $lastPosition = $this->playerPositions[$playerName];
             $distance = $position->distance($lastPosition);
             
-            // Si se movió demasiado rápido
             if ($distance > 15.0) {
                 return true;
             }
         }
         
-        // Verificar si está volando sin permisos
         if ($player->isFlying() && !$player->getAllowFlight() && !$player->hasPermission("ultimateantiglitch.bypass")) {
             return true;
         }
@@ -518,7 +553,6 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         $world = $player->getWorld();
         $currentPos = $player->getPosition();
         
-        // Buscar hacia arriba
         for ($y = $currentPos->getY(); $y < $world->getMaxY(); $y++) {
             $checkPos = new Position($currentPos->getX(), $y, $currentPos->getZ(), $world);
             
@@ -527,7 +561,6 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
             }
         }
         
-        // Si no encuentra posición segura, usar spawn
         return $world->getSpawnLocation();
     }
     
@@ -543,7 +576,6 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         $player = $this->getServer()->getPlayerExact($playerName);
         
         if ($player === null || !$player->isOnline()) {
-            // Jugador desconectado = glitch de desconexión
             if ($this->config->get("log-glitches")) {
                 $this->getLogger()->warning("GLITCH DE DESCONEXIÓN: {$playerName} se desconectó mientras rompía bloque");
             }
@@ -551,12 +583,10 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
             return;
         }
         
-        // Verificar si el bloque aún existe
         $world = $data["position"]->getWorld();
         $block = $world->getBlock($data["position"]);
         
         if ($block->getTypeId() === $data["block_type"]) {
-            // El bloque no se rompió = posible glitch
             $this->addViolation($player, "Bloque no se rompió después de tiempo límite");
         }
         
@@ -564,7 +594,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     }
     
     /**
-     * Agrega una violación al jugador - SIN CONGELAMIENTO NI KICK
+     * Agrega una violación al jugador - SIN LOGS DE VELOCIDAD
      */
     private function addViolation(Player $player, string $reason): void {
         $playerName = $player->getName();
@@ -576,7 +606,8 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         $this->violationCount[$playerName]++;
         $violations = $this->violationCount[$playerName];
         
-        if ($this->config->get("log-glitches")) {
+        // Solo logear si no es una violación de velocidad
+        if ($this->config->get("log-glitches") && !str_contains(strtolower($reason), "velocidad")) {
             $this->getLogger()->warning("VIOLACIÓN #{$violations} - {$playerName}: {$reason}");
         }
         
@@ -584,12 +615,12 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         if ($violations >= 5) {
             $player->sendMessage("§cAdvertencia severa: Se detectó actividad sospechosa repetida.");
         } elseif ($violations >= 3) {
-            $player->sendMessage("§eAdvertencia: Múltiples violaciones detectadas. Violación: {$reason}");
+            $player->sendMessage("§eAdvertencia: Múltiples violaciones detectadas.");
         } else {
-            $player->sendMessage("§eAdvertencia: {$reason}");
+            if (!str_contains(strtolower($reason), "velocidad")) {
+                $player->sendMessage("§eAdvertencia: Actividad sospechosa detectada.");
+            }
         }
-        
-        // NO más congelamiento ni kicks
     }
     
     /**
@@ -598,28 +629,32 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     private function cleanupOldData(): void {
         $currentTime = time();
         
-        // Limpiar cooldowns expirados
         foreach ($this->pearlCooldowns as $playerName => $expireTime) {
             if ($currentTime > $expireTime) {
                 unset($this->pearlCooldowns[$playerName]);
             }
         }
         
-        // Limpiar datos de desconexión antiguos
         foreach ($this->disconnectData as $playerName => $data) {
             if ($currentTime - $data["disconnect_time"] > 3600) {
                 unset($this->disconnectData[$playerName]);
             }
         }
         
-        // Limpiar tracking de perlas antiguas
         foreach ($this->pearlTracking as $entityId => $data) {
             if (microtime(true) - $data["launch_time"] > 30) {
                 unset($this->pearlTracking[$entityId]);
             }
         }
         
-        // Reducir violaciones cada hora
+        // Limpiar posiciones de pearl antiguas
+        foreach ($this->pearlStartPositions as $playerName => $position) {
+            $player = $this->getServer()->getPlayerExact($playerName);
+            if ($player === null || !$player->isOnline()) {
+                unset($this->pearlStartPositions[$playerName]);
+            }
+        }
+        
         foreach ($this->violationCount as $playerName => $count) {
             if ($count > 0) {
                 $this->violationCount[$playerName] = max(0, $count - 1);
@@ -636,7 +671,6 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         
         $messages[] = "§e=== Verificación de {$playerName} ===";
         
-        // Verificar cooldown de perlas
         if (isset($this->pearlCooldowns[$playerName])) {
             $timeLeft = $this->pearlCooldowns[$playerName] - time();
             if ($timeLeft > 0) {
@@ -648,32 +682,28 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
             $messages[] = "§7Cooldown de perla: §aDisponible";
         }
         
-        // Verificar violaciones
         $violations = $this->violationCount[$playerName] ?? 0;
         $messages[] = "§7Violaciones: §f{$violations}";
         
-        // Verificar posición
         $position = $player->getPosition();
         $messages[] = "§7Posición: §f" . round($position->getX(), 2) . ", " . round($position->getY(), 2) . ", " . round($position->getZ(), 2);
         
-        // Verificar si está en posición sospechosa
         if ($this->isPlayerInSuspiciousPosition($player)) {
             $messages[] = "§7Posición: §cSospechosa";
         } else {
             $messages[] = "§7Posición: §aNormal";
         }
         
-        // Verificar velocidad actual
-        if (isset($this->playerVelocity[$playerName])) {
-            $velocity = round($this->playerVelocity[$playerName]["velocity"], 2);
-            $messages[] = "§7Velocidad: §f{$velocity} b/s";
-        }
-        
-        // Verificar permisos
         if ($player->hasPermission("ultimateantiglitch.bypass")) {
             $messages[] = "§7Permisos: §aBypass activado";
         } else {
             $messages[] = "§7Permisos: §fNormal";
+        }
+        
+        // Mostrar posición segura registrada
+        if (isset($this->safePositions[$playerName])) {
+            $safePos = $this->safePositions[$playerName];
+            $messages[] = "§7Posición segura: §f" . round($safePos->getX(), 2) . ", " . round($safePos->getY(), 2) . ", " . round($safePos->getZ(), 2);
         }
         
         foreach ($messages as $message) {
