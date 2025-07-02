@@ -1,24 +1,21 @@
-# Configuración de UltimateAntiGlitch Plugin
+# Configuración de UltimateAntiGlitch Plugin - Modo Suave
 # Por Phoenix4041 - github.com/Phoenix4041
 
 # Cooldown en segundos para usar perlas de ender
-pearl-cooldown: 3
+pearl-cooldown: 2
 
-# Distancia máxima permitida para teletransporte con perlas
-max-pearl-distance: 15
-
-# Tiempo en segundos para considerar glitch de desconexión al minar
-block-break-timeout: 10
-
-# Si kickear automáticamente a jugadores que usen glitches
-kick-on-glitch: true
+# Distancia máxima permitida para teletransporte con perlas (se duplicará internamente)
+max-pearl-distance: 20
 
 # Si registrar intentos de glitch en los logs del servidor
 log-glitches: true
 
+# Configuración desactivada - ya no se usan
+kick-on-glitch: false
+block-break-timeout: 30
+
 # Mensajes del plugin
 messages:
-  pearl-cooldown: "§cDebes esperar antes de usar otra perla de ender!"
-  pearl-blocked: "§cUso de perla bloqueado - movimiento sospechoso detectado!"
-  glitch-detected: "§cGlitch detectado! Acción bloqueada."
-  kick-message: "§cExpulsado por usar glitches"
+  pearl-cooldown: "§eDebes esperar antes de usar otra perla de ender!"
+  pearl-blocked: "§eMovimiento con perla bloqueado - distancia muy extrema."
+  glitch-detected: "§eActividad inusual detectada."
