@@ -45,30 +45,6 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         $this->getLogger()->info("UltimateAntiGlitch Plugin - Desactivado");
     }
     
-    protected function saveDefaultConfig(): void {
-        $configData = [
-            "pearl-cooldown" => 3, // Cooldown en segundos para perlas
-            "max-pearl-distance" => 15, // Distancia máxima permitida para perlas
-            "block-break-timeout" => 10, // Tiempo en segundos para considerar glitch de desconexión
-            "kick-on-glitch" => true, // Si kickear al jugador al detectar glitch
-            "log-glitches" => true, // Si registrar glitches en logs
-            "messages" => [
-                "pearl-cooldown" => "§cDebes esperar antes de usar otra perla de ender!",
-                "pearl-blocked" => "§cUso de perla bloqueado - movimiento sospechoso detectado!",
-                "glitch-detected" => "§cGlitch detectado! Acción bloqueada.",
-                "kick-message" => "§cExpulsado por usar glitches"
-            ]
-        ];
-        
-        if (!file_exists($this->getDataFolder())) {
-            mkdir($this->getDataFolder());
-        }
-        
-        if (!file_exists($this->getDataFolder() . "config.yml")) {
-            file_put_contents($this->getDataFolder() . "config.yml", yaml_emit($configData));
-        }
-    }
-    
     /**
      * Maneja el uso de perlas de ender
      */
@@ -297,7 +273,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
                     }
                     
                     // Verificar si no es teletransporte legítimo (comando, plugin, etc.)
-                    if (!$player->hasPermission("UltimateAntiGlitch.bypass")) {
+                    if (!$player->hasPermission("ultimateantiglitch.bypass")) {
                         $player->teleport($lastPosition);
                         $player->sendMessage($this->config->get("messages")["glitch-detected"]);
                     }
