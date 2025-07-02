@@ -453,7 +453,7 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
     }
     
     /**
-     * Verifica si un jugador está dentro de bloques sólidos
+     * Verifica si un jugador está dentro de bloques sólidos - CORREGIDO
      */
     private function isPlayerInsideSolidBlocks(Player $player, ?Position $pos = null): bool {
         $position = $pos ?? $player->getPosition();
@@ -468,7 +468,11 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         
         foreach ($positions as $checkPos) {
             $block = $world->getBlock($checkPos);
-            if ($block->isSolid() && !$block->equals(VanillaBlocks::WATER()) && !$block->equals(VanillaBlocks::LAVA())) {
+            
+            // Usar getTypeId() para comparar bloques en lugar de equals()
+            if ($block->isSolid() && 
+                $block->getTypeId() !== VanillaBlocks::WATER()->getTypeId() && 
+                $block->getTypeId() !== VanillaBlocks::LAVA()->getTypeId()) {
                 return true;
             }
         }
