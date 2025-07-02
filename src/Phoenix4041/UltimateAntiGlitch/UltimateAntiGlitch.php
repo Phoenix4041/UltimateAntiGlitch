@@ -486,25 +486,38 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         $this->violationCount[$playerName] = $this->violationCount[$playerName] ?? 0;
     }
     
-    /**
-     * Verifica si un jugador está dentro de bloques sólidos
+/**
+     * Verifica si un jugador está dentro de bloques sólidos (CORREGIDO PARA LOSAS)
      */
     private function isPlayerInsideSolidBlocks(Player $player, ?Position $pos = null): bool {
         $position = $pos ?? $player->getPosition();
         $world = $position->getWorld();
         
+        // Solo verificar a la altura de la cabeza del jugador (1.8 bloques)
+        $headPosition = $position->add(0, 1.8, 0);
+        $chestPosition = $position->add(0, 1, 0);
+        
         $positions = [
-            $position,
-            $position->add(0, 1, 0),
-            $position->add(0, 1.8, 0)
+            $headPosition,  // Cabeza
+            $chestPosition  // Pecho
         ];
         
         foreach ($positions as $checkPos) {
             $block = $world->getBlock($checkPos);
             
+            // Solo considerar bloques realmente sólidos completos
             if ($block->isSolid() && 
                 $block->getTypeId() !== VanillaBlocks::WATER()->getTypeId() && 
                 $block->getTypeId() !== VanillaBlocks::LAVA()->getTypeId()) {
+                
+                // Verificar si es una losa (slab) - las losas no bloquean completamente
+                $blockName = strtolower($block->getName());
+                if (strpos($blockName, 'slab') !== false || 
+                    strpos($blockName, 'step') !== false ||
+                    strpos($blockName, 'stair') !== false) {
+                    continue; // Ignorar losas y escaleras
+                }
+                
                 return true;
             }
         }
