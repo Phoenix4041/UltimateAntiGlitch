@@ -295,22 +295,15 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
             ];
         }
         
-        // Detectar teletransporte ilegal
-        if ($distance > 8.0) {
-            $this->addViolation($player, "Movimiento sospechoso");
-            $event->cancel();
-            
-            // Regresar a la posición segura exacta
-            $this->returnToSafePosition($player);
-            return;
-        }
-        
-        // Detectar velocidad excesiva SIN LOGS
+// Detectar velocidad excesiva SIN LOGS (ignorar movimientos verticales normales)
         if (isset($this->playerVelocity[$playerName])) {
             $velocity = $this->playerVelocity[$playerName]["velocity"];
-            $maxVelocity = $player->isFlying() ? 20.0 : 12.0;
+            $maxVelocity = $player->isFlying() ? 20.0 : 15.0;
             
-            if ($velocity > $maxVelocity && $distance > 1.0) {
+            // Calcular distancia horizontal para ignorar saltos/losas
+            $horizontalDistance = sqrt(pow($to->getX() - $from->getX(), 2) + pow($to->getZ() - $from->getZ(), 2));
+            
+            if ($velocity > $maxVelocity && $horizontalDistance > 2.0) {
                 $this->addViolation($player, "Velocidad excesiva");
                 $event->cancel();
                 
