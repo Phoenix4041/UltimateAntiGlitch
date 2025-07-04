@@ -526,11 +526,6 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
                 return true;
             }
         }
-        
-        if ($player->isFlying() && !$player->getAllowFlight() && !$player->hasPermission("ultimateantiglitch.bypass")) {
-            return true;
-        }
-        
         return false;
     }
     
@@ -581,8 +576,8 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         unset($this->blockBreakData[$playerName]);
     }
     
-    /**
-     * Agrega una violación al jugador - SIN LOGS DE VELOCIDAD
+/**
+     * Agrega una violación al jugador
      */
     private function addViolation(Player $player, string $reason): void {
         $playerName = $player->getName();
@@ -594,21 +589,10 @@ class UltimateAntiGlitch extends PluginBase implements Listener {
         $this->violationCount[$playerName]++;
         $violations = $this->violationCount[$playerName];
         
-        // Solo logear si no es una violación de velocidad
         if ($this->config->get("log-glitches") && !str_contains(strtolower($reason), "velocidad")) {
             $this->getLogger()->warning("VIOLACIÓN #{$violations} - {$playerName}: {$reason}");
         }
         
-        // Solo advertencias, sin penalizaciones severas
-        if ($violations >= 5) {
-            $player->sendMessage("§cAdvertencia severa: Se detectó actividad sospechosa repetida.");
-        } elseif ($violations >= 3) {
-            $player->sendMessage("§eAdvertencia: Múltiples violaciones detectadas.");
-        } else {
-            if (!str_contains(strtolower($reason), "velocidad")) {
-                $player->sendMessage("§eAdvertencia: Actividad sospechosa detectada.");
-            }
-        }
     }
     
     /**
